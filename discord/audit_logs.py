@@ -283,11 +283,15 @@ def _flag_transformer(cls: Type[F]) -> Callable[[AuditLogEntry, Union[int, str]]
     return _transform
 
 
-def _transform_type(entry: AuditLogEntry, data: Union[int, str]) -> Union[enums.ChannelType, enums.StickerType, str]:
+def _transform_type(
+    entry: AuditLogEntry, data: Union[int, str]
+) -> Union[enums.ChannelType, enums.StickerType, enums.WebhookType, str]:
     if entry.action.name.startswith('sticker_'):
         return enums.try_enum(enums.StickerType, data)
     elif entry.action.name.startswith('integration_'):
         return data  # type: ignore  # integration type is str
+    elif entry.action.name.startswith('webhook_'):
+        return enums.try_enum(enums.WebhookType, data)
     else:
         return enums.try_enum(enums.ChannelType, data)
 
@@ -719,11 +723,12 @@ class AuditLogEntry(Hashable):
         if self.action.target_type is None:
             return None
 
+        if self._target_id is None:
+            return None
+
         try:
             converter = getattr(self, '_convert_target_' + self.action.target_type)
         except AttributeError:
-            if self._target_id is None:
-                return None
             return Object(id=self._target_id)
         else:
             return converter(self._target_id)
